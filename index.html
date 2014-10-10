@@ -5,9 +5,10 @@
     </head>
     <body>
         <h1>File Upload</h1>
-        <form enctype="multipart/form-data" name="fileUpload" id="fileUpload" method="post" action="/upload">
-            <p>Upload File: <input type="file" name="file" /></p>
-            <p><input type="submit" value="submit" /></p>
-        </form>
+        <p>Upload File: <input type="file" id="file" /></p>
+        <div id="output">Please provide the file to be upload</div>
+        <script type="text/javascript" src="{{static_url("jquery-1.11.0.min.js")}}"></script>
+        <script type="text/javascript" src="{{static_url("resumable.js")}}"></script>
+        <script type="text/javascript" src="{{static_url("upload.js")}}"></script>
     </body>
 </html>
