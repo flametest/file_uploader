@@ -3,11 +3,12 @@
 
 
 import os
+import shutil
 import tornado.web
 import tornado.httpserver
 from tornado.options import define, options
 
-define("port", default=8888, type=int)
+define("port", default=8880, type=int)
 
 
 class MainHanlder(tornado.web.RequestHandler):
@@ -33,12 +34,16 @@ class UploadHandler(tornado.web.RequestHandler):
             self.tmp_dir,
             "part" + str(self.get_argument("resumableChunkNumber"))
         )
+        self.chunk_num = int(self.get_argument("resumableChunkNumber"))
+        self.chunk_size = int(self.get_argument("resumableChunkSize"))
+        self.total_size = int(self.get_argument("resumableTotalSize"))
 
     def prepare(self):
         pass
 
     def get(self):
-        '''when the chunk to be uploaded exists, we return status code 200, 
+        '''first, if the file to be uploaded exists, do nothing.
+            when the chunk to be uploaded exists, we return status code 200, 
            otherwise return 404, so that this chunk could be posted again.
         '''
 
@@ -54,8 +59,32 @@ class UploadHandler(tornado.web.RequestHandler):
 
         if not os.path.exists(self.tmp_dir):
             os.mkdir(self.tmp_dir)
+
         with open(self.chunk, "wb") as f:
             f.write(self.request.files["file"][0]["body"])
+
+        self.check_complete()
+
+    def check_complete(self):
+        '''check if all the chunks have been uploaded, if so, 
+           concatienate all the chunks 
+        '''
+
+        uploaded_chunk_size = self.chunk_num * self.chunk_size
+        current_chunk_size = int(self.get_argument("resumableCurrentChunkSize"))
+
+        if uploaded_chunk_size + current_chunk_size >= self.total_size:
+            file_name = self.get_argument("resumableFilename", "data")
+            save_path = os.path.join(self.upload_path, file_name)
+            with open(save_path, "w+") as f:
+                for i in range(1, self.chunk_num + 1):
+                    chunk_file = os.path.join(
+                        self.tmp_dir,
+                        "part" + str(i)
+                    )
+                    with open(chunk_file) as g:
+                        f.write(g.read())
+            shutil.rmtree(self.tmp_dir)
 
 
 class Application(tornado.web.Application):
@@ -76,6 +105,7 @@ class Application(tornado.web.Application):
 
 
 def main():
+
     tornado.options.parse_command_line()
     http_server = tornado.httpserver.HTTPServer(Application())
     http_server.listen(options.port)
