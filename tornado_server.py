@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
+__author__ = "jiangjun"
 
 import os
 import shutil
@@ -8,7 +9,7 @@ import tornado.web
 import tornado.httpserver
 from tornado.options import define, options
 
-define("port", default=8880, type=int)
+define("port", default=8888, type=int)
 
 
 class MainHanlder(tornado.web.RequestHandler):
@@ -26,6 +27,7 @@ class UploadHandler(tornado.web.RequestHandler):
     def initialize(self):
 
         self.upload_path = os.path.join(os.getcwd(), "upload")
+        self.file_name = self.get_argument("resumableFilename", "data")
         self.tmp_dir = os.path.join(
             self.upload_path,
             self.get_argument("resumableIdentifier")
@@ -46,8 +48,9 @@ class UploadHandler(tornado.web.RequestHandler):
             when the chunk to be uploaded exists, we return status code 200, 
            otherwise return 404, so that this chunk could be posted again.
         '''
-
-        if os.path.exists(self.chunk):
+        if os.path.exists(os.path.join(self.upload_path, self.file_name)):
+            self.set_status(200)
+        elif os.path.exists(self.chunk):
             self.set_status(200)
         else:
             self.set_status(404)
@@ -67,15 +70,15 @@ class UploadHandler(tornado.web.RequestHandler):
 
     def check_complete(self):
         '''check if all the chunks have been uploaded, if so, 
-           concatienate all the chunks 
+           concatenate all the chunks.
         '''
 
         uploaded_chunk_size = self.chunk_num * self.chunk_size
         current_chunk_size = int(self.get_argument("resumableCurrentChunkSize"))
 
         if uploaded_chunk_size + current_chunk_size >= self.total_size:
-            file_name = self.get_argument("resumableFilename", "data")
-            save_path = os.path.join(self.upload_path, file_name)
+            
+            save_path = os.path.join(self.upload_path, self.file_name )
             with open(save_path, "w+") as f:
                 for i in range(1, self.chunk_num + 1):
                     chunk_file = os.path.join(
@@ -84,6 +87,11 @@ class UploadHandler(tornado.web.RequestHandler):
                     )
                     with open(chunk_file) as g:
                         f.write(g.read())
+            self.remove_tmpfiles()
+
+    def remove_tmpfiles(self):
+        
+        if os.path.exists(self.tmp_dir):
             shutil.rmtree(self.tmp_dir)
 
 
