@@ -7,10 +7,11 @@ import os
 import shutil
 import tornado.web
 import tornado.gen
+import tornado.autoreload
 import tornado.httpserver
 from tornado.options import define, options
 
-define("port", default=8880, type=int)
+define("port", default=8888, type=int)
 
 BUFF_SIZE = 8*1024
 
