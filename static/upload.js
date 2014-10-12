@@ -24,6 +24,27 @@ $(document).ready(function(){
     });
     r.on("complete",function() {
         // upload complete
-        output_text.innerHTML = "Uploaded complete!";
+        $.ajax({
+            type:"POST",
+            url:"/",
+            success:function (data) {
+                var msg = "<p><a href=\"/download/{0}\">{1}</a></p>"
+                var output_string = "Uploaded complete! Download ";
+                data_list = data.split("||");
+                for(var i in data_list){
+                    output_string += msg.format(data_list[i], data_list[i]);
+                }
+                
+                output_text.innerHTML = output_string;
+            }
+        });
+        
     });
+    String.prototype.format = function() {
+        var formatted = this;
+        for( var arg in arguments ) {
+            formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+    }
+    return formatted;
+};
 })
