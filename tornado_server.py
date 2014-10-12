@@ -14,9 +14,21 @@ define("port", default=8888, type=int)
 
 class MainHanlder(tornado.web.RequestHandler):
 
+    def initialize(self):
+
+        self.upload_path = os.path.join(os.getcwd(), "upload")
+
     def get(self):
 
         self.render("index.html")
+
+    def post(self):
+        '''send the file_list to ajax request
+        '''
+
+        file_list = [a for a in os.listdir(self.upload_path)]
+        self.set_status(200)
+        self.write("||".join(file_list))
 
 
 class UploadHandler(tornado.web.RequestHandler):
@@ -77,8 +89,8 @@ class UploadHandler(tornado.web.RequestHandler):
         current_chunk_size = int(self.get_argument("resumableCurrentChunkSize"))
 
         if uploaded_chunk_size + current_chunk_size >= self.total_size:
-            
-            save_path = os.path.join(self.upload_path, self.file_name )
+
+            save_path = os.path.join(self.upload_path, self.file_name)
             with open(save_path, "w+") as f:
                 for i in range(1, self.chunk_num + 1):
                     chunk_file = os.path.join(
@@ -90,9 +102,29 @@ class UploadHandler(tornado.web.RequestHandler):
             self.remove_tmpfiles()
 
     def remove_tmpfiles(self):
-        
+
         if os.path.exists(self.tmp_dir):
             shutil.rmtree(self.tmp_dir)
+
+
+class DownloadHandler(tornado.web.RequestHandler):
+
+    def initialize(self):
+
+        self.upload_path = os.path.join(os.getcwd(), "upload")
+
+    def get(self, upload_file):
+
+        buf_size = 8192
+        self.set_header('Content-Type', 'application/octet-stream')
+        self.set_header('Content-Disposition', 'attachment; filename=' + upload_file)
+        with open(os.path.join(self.upload_path, upload_file), 'rb') as f:
+            while True:
+                data = f.read(buf_size)
+                if not data:
+                    break
+                self.write(data)
+        self.finish()
 
 
 class Application(tornado.web.Application):
@@ -101,7 +133,8 @@ class Application(tornado.web.Application):
 
         handlers = [
             (r"/", MainHanlder),
-            (r"/upload", UploadHandler)
+            (r"/upload", UploadHandler),
+            (r'/download/(.*)', DownloadHandler)
         ]
 
         settings = {
