@@ -6,10 +6,13 @@ __author__ = "jiangjun"
 import os
 import shutil
 import tornado.web
+import tornado.gen
 import tornado.httpserver
 from tornado.options import define, options
 
-define("port", default=8888, type=int)
+define("port", default=8880, type=int)
+
+BUFF_SIZE = 8*1024
 
 
 class MainHanlder(tornado.web.RequestHandler):
@@ -67,6 +70,7 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             self.set_status(404)
 
+    @tornado.web.asynchronous
     def post(self):
         '''save every chunk uploaded to a temporary directory, 
            and name the file as "part"+resumableChunkNumber
@@ -74,6 +78,12 @@ class UploadHandler(tornado.web.RequestHandler):
 
         if not os.path.exists(self.tmp_dir):
             os.mkdir(self.tmp_dir)
+
+        tornado.ioloop.IOLoop.instance().add_callback(self.save_tmp_files)
+
+        self.finish()
+
+    def save_tmp_files(self):
 
         with open(self.chunk, "wb") as f:
             f.write(self.request.files["file"][0]["body"])
@@ -97,7 +107,7 @@ class UploadHandler(tornado.web.RequestHandler):
                         self.tmp_dir,
                         "part" + str(i)
                     )
-                    with open(chunk_file) as g:
+                    with open(chunk_file, "rb") as g:
                         f.write(g.read())
             self.remove_tmpfiles()
 
@@ -113,18 +123,25 @@ class DownloadHandler(tornado.web.RequestHandler):
 
         self.upload_path = os.path.join(os.getcwd(), "upload")
 
+    @tornado.web.asynchronous
+    @tornado.gen.engine
     def get(self, upload_file):
 
-        buf_size = 8192
         self.set_header('Content-Type', 'application/octet-stream')
         self.set_header('Content-Disposition', 'attachment; filename=' + upload_file)
+        yield tornado.gen.Task(self.send_file, upload_file)
+        self.finish()
+
+    def send_file(self, upload_file, callback):
+
         with open(os.path.join(self.upload_path, upload_file), 'rb') as f:
             while True:
-                data = f.read(buf_size)
+                data = f.read(BUFF_SIZE)
                 if not data:
                     break
                 self.write(data)
-        self.finish()
+                self.flush()
+                callback()
 
 
 class Application(tornado.web.Application):
